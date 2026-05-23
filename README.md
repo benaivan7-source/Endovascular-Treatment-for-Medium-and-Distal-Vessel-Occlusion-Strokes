@@ -32,8 +32,14 @@ This repository contains the complete analytical pipeline and replication code f
 ## Repository Structure
 
 * `Frequentist_Analysis.R` - Executes the REML/HK frequentist models and generates dynamic forest plots.
-* `Bayesian_Analysis.R` - Executes the Bayesian random-effects models, posterior probability calculations, and distribution visualizations.
-* `Data_Template.xlsx` - (Example) The required structure for the summary data input.
+  
+* `Bayesian_Analysis_ACM.R` - Executes the Bayesian random-effects models, posterior probability calculations, and distribution visualizations for all-cause mortality.
+  
+* `Bayesian_Analysis_MRS.R` - Executes the Bayesian random-effects models, posterior probability calculations, and distribution visualizations for functional independence at 90 days (mRs 0-2).
+  
+* `Bayesian_Analysis_SICH.R` - Executes the Bayesian random-effects models, posterior probability calculations, and distribution visualizations for symptomatic intracranial hemorrhage.
+    
+* `MDVO_outcomes.xlsx` -  The required structure for the summary data input.
 
 ---
 
@@ -42,7 +48,7 @@ This repository contains the complete analytical pipeline and replication code f
 The scripts are highly automated and feature built-in package management. Upon running the scripts, the `pacman` package will automatically install and load the necessary dependencies. 
 
 **Core Dependencies:**
-* `meta` (Locked to version 8.3-0 for reproducibility)
+* `meta` (Locked to version 8.3-0 in frequentist analysis and 7.0-0 in Bayesian analysis for reproducibility)
 * `bayesmeta`
 * `BayesianPriorsTool` (Installed via GitHub)
 * `tidyverse` (Data wrangling and `ggplot2`)
