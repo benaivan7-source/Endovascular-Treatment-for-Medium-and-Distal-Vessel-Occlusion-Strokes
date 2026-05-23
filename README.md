@@ -73,6 +73,29 @@ Execute blocks `#003.1` through `#003.3`.
 **Step 3: Define the Active Outcome**
 Navigate to block `#004`. Change the `active_outcome` string to the endpoint you wish to analyze. The script will automatically route the correct data sheet, plot labels, and clinical directionality (e.g., ensuring OR > 1 correctly favors EVT for mRS, but favors BMT for mortality).
 
-```R
+
 # Set ONLY this value before running the analysis pipeline
 active_outcome <- "sich"   # options: "mrs", "acm", "sich"
+
+**Step 4: Execute Pipeline**
+Run the remainder of the script. Forest plots, posterior density plots, and leave-one-out diagnostic graphics will be automatically formatted, labeled, and exported to your chosen directory.
+
+**Data Structure Requirement**
+To use these scripts with your own data, ensure your Excel workbook has separate sheets for each outcome (e.g., named mrs, acm, sich). Each sheet must contain the following column headers:
+
+* author: Study identifier (e.g., DISTAL, ESCAPE-MeVO)
+
+* event.e: Number of events in the EVT (experimental) arm
+
+* n.e: Total patients in the EVT arm
+
+* event.c: Number of events in the BMT (control) arm
+
+* n.c: Total patients in the BMT arm
+
+Author
+Joseph Y. Bena Nnang
+Faculty of Medicine and Biomedical Sciences, University of Yaounde I, Yaounde, Cameroon.
+Contact: benaivan7@gmail.com
+
+```R
