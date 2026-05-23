@@ -1,0 +1,246 @@
+---
+title: "Endovascular Treatment for Medium and Distal Vessel Occlusion Strokes:
+A Systematic Review and Frequentist–Bayesian Meta-Analysis of Randomised Controlled Trials"
+author: "Joseph Yvan Bena Nnang"
+format: html
+editor_options: 
+  chunk_output_type: inline
+---
+
+
+#001) Install the Packages (ONLY IF NOT INSTALLED BEFORE)
+
+```{r}
+#001) Install the Packages (ONLY IF NOT INSTALLED BEFORE)
+
+if (!require("pacman")) install.packages("pacman")
+if (!require("rstudioapi")) install.packages("rstudioapi")
+if (!require("readxl")) install.packages("readxl")
+if (!require("tidyverse")) install.packages("tidyverse")
+
+
+# List other packages that will be used (excluding meta)
+other_packages <- c("rstudioapi",          
+                    "readxl", 
+                    "tidyverse"              
+                   )                 
+
+# Check if meta is installed and get its version
+meta_version <- if (requireNamespace("meta", quietly = TRUE)) {
+  packageVersion("meta")
+} else {
+  "0.0-0"  # Dummy version to trigger installation
+}
+
+if (meta_version > "8.3-0") {
+  # If meta version is greater than 8.3-0, force install meta 7.0-0 and load all packages
+  remotes::install_version("meta", "8.3-0")
+  pacman::p_load(char =  c("meta", other_packages))
+  
+} else if (meta_version == "8.3-0") {
+  # If meta version is exactly 7.0-0, load packages including meta
+  pacman::p_load(char = c("meta", other_packages))
+  
+} else {
+  # If meta is not installed or version is less than 8.3-0, force install meta 7.0-0 and load all packages
+  remotes::install_version("meta", "8.3-0")
+  pacman::p_load(char = c("meta", other_packages))
+}
+```
+
+We will use ggplot2 to create some plots. Here is the code to create a custom theme for better looking plots. It will apply to all ggplot2 graphs from now onward:
+
+```{r}
+theme_set(
+  theme(
+    plot.title.position = 'plot',
+    axis.ticks.x = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12),
+    axis.title.x = element_text(size = 14),
+    panel.background = element_blank(),
+    panel.grid.major.x = element_line(color = "gray80", linewidth = 0.3)
+  )
+)
+
+
+```
+
+
+#002) Load packages
+
+```{r}
+library(rstudioapi)
+library(readxl)
+library(meta)
+library(tidyverse)
+```
+
+#003) Import dataframe
+##003.1) Use RStudioAPI to select your table
+```{r}
+filepath <- selectFile()
+```
+
+##003.2)Create the dataframe
+```{r}
+sheetsnames <- excel_sheets(filepath)
+print(sheetsnames)
+
+ma <- lapply(sheetsnames, function(x) {
+  as.data.frame(read_excel(filepath, sheet = x))})
+
+names(ma) <- sheetsnames
+```
+
+##003.3)Choose your output folder
+```{r}
+output <- selectDirectory()
+```
+
+#004) Define the outcome(MOST IMPORTANT DO NOT SKIP)
+This is the most important step. You will select the Excel sheet corresponding to the outcome and assign it to your object (e.g., ma$sheetname). At the same time, you must also define a name for this outcome, which will later be displayed in your plots and titles. IMPORTANT: Every time you switch to a new table or endpoint, you must come back to this step and update both the sheet and the outcome name.
+
+Outcome (ALWAYS RETURN HERE AND RUN ONLY THE OUTCOME DESIRED)
+```{r}
+
+# Set ONLY this value before running the document
+active_outcome <- "sich"   # options: "mrs", "acm", "sich"
+
+outcome_map <- list(
+  mrs  = list(label = "Functional Independence (mRs 0-2)", sheet = "mrs"),
+  acm  = list(label = "All-cause mortality",               sheet = "acm"),
+  sich = list(label = "Symptomatic Intracranial Hemorrhage", sheet = "sich")
+)
+
+outcome <- outcome_map[[active_outcome]]$label
+data    <- ma[[ outcome_map[[active_outcome]]$sheet ]]
+
+
+#005) Binary Meta-Analysis
+##005.1) Create object with prediction
+
+meta <- metabin(event.e, n.e, 
+                event.c,n.c,
+                studlab = author,
+                data = data,
+                sm = "OR",
+                method = "inverse",
+                method.tau = "REML",
+                method.random.ci = "HK",
+                method.I2 = "tau2",
+                random = T,
+                common = F,
+                prediction = T,         #Prediction TRUE
+                method.predict = "V")
+```
+
+##005.2) Forest Plot
+At this step, we will already export the forest plot to the output folder. It is essential that you review the documentation on how to edit your forest plot, so you can fully understand how this conversion is performed and how to customize the figure according to your needs.
+```{r}
+if (outcome == "Functional Independence (mRs 0-2)") {
+  lbl_left <- "Favors Best Medical Treatment"
+  lbl_right <- "Favors Endovascular"
+  loo_xlab <- "Favors Best Medical Treatment    Favors Endovascular"
+} else {
+  # For adverse events (Mortality and sICH)
+  lbl_left <- "Favors Endovascular"
+  lbl_right <- "Favors Best Medical Treatment"
+  loo_xlab <- "Favors Endovascular    Favors Best Medical Treatment"
+}
+
+png(file = paste0(output,"/","Forest plot ", outcome, ".png"),
+    width = 3000,
+    height = 2500,
+    res = 300)
+
+forest(meta,
+       layout = "Revman5",
+       label.e = "EVT", 
+       label.c = "BMT", 
+       label.left = lbl_left,   # Uses dynamic variable
+       label.right = lbl_right,
+       leftcols = c("studlab",
+                    "event.e", "n.e", 
+                    "event.c", "n.c", 
+                    "w.random", 
+                    "effect", "ci" ) ,
+       leftlabs = c("Studies",  
+                    NA, NA, 
+                    NA, NA, 
+                    NA, 
+                    NA, NA),
+       test.overall.random = TRUE,
+       colgap = "3mm",
+       pooled.events = TRUE,
+       pooled.totals = TRUE,
+       col.square="darkblue", 
+       col.square.lines="black",
+       sortvar = TE)
+
+dev.off()
+```
+
+# tau² estimator comparison (REML vs DL vs PM)
+# Reported in manuscript: no meaningful differences found
+```{r}
+tau_REML <- metabin(event.e, n.e, event.c, n.c,
+                    studlab = author, data = data,
+                    sm = "OR", method = "inverse",
+                    method.tau = "REML", random = T, common = F)
+
+tau_DL   <- update(tau_REML, method.tau = "DL")
+tau_PM   <- update(tau_REML, method.tau = "PM")
+
+data.frame(
+  Estimator = c("REML", "DL", "PM"),
+  tau2      = round(c(tau_REML$tau2, tau_DL$tau2, tau_PM$tau2), 4),
+  I2        = round(c(tau_REML$I2,   tau_DL$I2,   tau_PM$I2),   1)
+)
+```
+
+
+##005.1) Create object without prediction
+```{r}
+meta <- metabin(event.e, n.e, 
+                event.c,n.c,
+                studlab = author,
+                data = data,
+                sm = "OR",
+                method = "inverse",
+                method.tau = "REML",
+                method.random.ci = "HK",
+                method.I2 = "tau2",
+                random = T,
+                common = F,
+                prediction = F,         #Prediction FALSE
+                method.predict = "V")
+```
+
+#006) Leave-one-out Analysis
+##006.1) Create LoO object
+```{r}
+meta_loo <- metainf(meta,
+                    pooled = "random")
+```
+
+##007.2) Create LoO forest plot
+```{r}
+png(file = paste0(output,"/","Leave-one-out ", outcome, ".png"),
+    width = 3000,
+    height = 2500,
+    res = 300)
+
+forest(meta_loo,
+       col.bg="lightblue",
+       col.diamond="gray",
+       xlab=loo_xlab, #USES DYNAMIC VARIABLE
+       ff.xlab = "bold",
+       rightcols = c("effect", "ci", "I2","pval"),
+       colgap.right = "6mm",
+       just = "center")
+
+dev.off()
+
+```

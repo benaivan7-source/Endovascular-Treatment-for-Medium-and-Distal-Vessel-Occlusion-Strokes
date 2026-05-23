@@ -1,0 +1,775 @@
+---
+title: "Endovascular Treatment for Medium and Distal Vessel Occlusion Strokes:
+A Systematic Review and Frequentist–Bayesian Meta-Analysis of Randomised Controlled Trials"
+outcome: "Functional outcomes (mRs 0-2)"
+author: "Joseph Yvan Bena Nnang"
+format: html
+editor_options: 
+  chunk_output_type: inline
+---
+
+# Packages
+
+Install these packages to facilitate future package installation
+
+```{r}
+if (!require("devtools")) install.packages("devtools")
+if (!require("pacman")) install.packages("pacman")
+```
+
+Install custom package
+
+```{r}
+devtools::install_github("arthur-albuquerque/BayesianPriorsTool") 
+```
+
+Now let's use the function `p_load` from `pacman` to install and load all other packages
+
+```{r}
+# To run all code properly, we need to install/load the meta package at version 7.0.0
+# The code below automates this process to check if you have the correct version
+# installed. If not, it will install and load for you.
+
+# List other packages that will be used (excluding meta)
+other_packages <- c("bayesmeta",          # Bayesian Meta-Analysis
+                    "BayesianPriorsTool", # Priors Building Tool
+                    "dplyr",              # Data Wrangle
+                    "tidyr",              # Data Wrangle
+                    "metafor",            # Effect Sizes
+                    "ggdist",             # Distributions
+                    "ggplot2",            # Plots
+                    "patchwork",          # Plots
+                    "gt")                 # Tables
+
+# Check if meta is installed and get its version
+meta_version <- if (requireNamespace("meta", quietly = TRUE)) {
+  packageVersion("meta")
+} else {
+  "0.0-0"  # Dummy version to trigger installation
+}
+
+if (meta_version > "7.0-0") {
+  # If meta version is greater than 7.0-0, force install meta 7.0-0 and load all packages
+  remotes::install_version("meta", "7.0-0")
+  pacman::p_load(char =  c("meta", other_packages))
+  
+} else if (meta_version == "7.0-0") {
+  # If meta version is exactly 7.0-0, load packages including meta
+  pacman::p_load(char = c("meta", other_packages))
+  
+} else {
+  # If meta is not installed or version is less than 7.0-0, force install meta 7.0-0 and load all packages
+  remotes::install_version("meta", "7.0-0")
+  pacman::p_load(char = c("meta", other_packages))
+}
+```
+
+We will use ggplot2 to create some plots. Here is the code to create a custom theme for better looking plots. It will apply to all ggplot2 graphs from now onward:
+
+```{r}
+theme_set(
+  theme(
+    plot.title.position = 'plot',
+    axis.ticks.x = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12),
+    axis.title.x = element_text(size = 14),
+    panel.background = element_blank(),
+    panel.grid.major.x = element_line(color = "gray80", linewidth = 0.3)
+  )
+)
+```
+
+We will use a $Normal(0, 0.5^2)$ prior for the primary analysis. Let's store the mean and standard deviation values to objects so we can use them later in the code:
+
+```{r}
+prior_mu_mean_OR = 0
+prior_mu_sd_OR = 0.5
+```
+
+Let's set saving directory and visualize this prior with the custom function from the `BayesianPriorsTool` package:
+
+```{r}
+pacman::p_load(
+  "readxl",
+  "rstudioapi"
+)
+output <- selectDirectory()
+outcome <- "Functional Independence (mRs 0-2)" #NAME THE ENDPOINT
+
+mu_dist_viz(mean = prior_mu_mean_OR, 
+            sd = prior_mu_sd_OR,
+            scale = "relative",
+            xlabel = "Odds Ratio")
+```
+
+
+#### Step 3: Prior for the between-study heterogeneity
+
+
+##### [**Informative**]{.underline}
+
+We will use an Informative prior for the primary analysis by applying the distribution derived by Turner et al. (DOI: 10.1002/sim.6381). Fortunately, `bayesmeta` has a function that facilitates the process of finding the ideal distribution for our informative prior. The function is called `TurnerEtAlPrior`. Let's take a look at its help page to see how it works:
+
+```{r}
+?TurnerEtAlPrior
+```
+
+In summary, we need to find the outcome category that it's the closest to our dataset's outcome and the treatment's ("comparator") type.
+
+In this example, our outcome is "functional independence".
+
+The comparator 1 is endovascular treatment, thus "non-pharmacological" and comparator 2 is standard of care, we'll use "placebo / control".
+
+Thus, we can derive our informative prior for the between-study heterogeneity as:
+
+```{r}
+informative_tau_prior_OR =
+  TurnerEtAlPrior(outcome = "quality of life / functioning (dichotomized)",
+                comparator1 = "non-pharmacological",
+                comparator2 = "placebo / control")
+
+```
+
+We can check how the distribution is defined:
+
+```{r}
+informative_tau_prior_OR$parameters
+```
+
+We are interested in "tau". Since this is a $Log-Normal$ distribution, it is defined by a mean ("mu") and sd ("sigma"). We should assign these values to objects:
+
+```{r}
+informative_prior_OR_mean = informative_tau_prior_OR$parameters["tau", "mu"]
+
+informative_prior_OR_mean
+```
+
+```{r}
+informative_prior_OR_sd = informative_tau_prior_OR$parameters["tau", "sigma"]
+
+informative_prior_OR_sd
+```
+
+Now let's visualize this distribution with the custom function from the `BayesianPriorsTool` package:
+
+```{r}
+png(file = paste0(output,"/","Informative tau prior distribution ", outcome, ".png"),
+    width = 3000,
+    height = 2500,
+    res = 300)
+
+tau_dist_viz(dist = "log-normal",
+             meanlog = informative_prior_OR_mean,
+             sdlog = informative_prior_OR_sd)
+
+dev.off() 
+```
+
+Lastly, sensitivity analyses with different prior are important. Since our primary analysis will be using an informative prior, our sensitivity analyses will apply **weakly-informative**  prior (one analysis).
+
+##### [**Weakly-Informative**]{.underline}
+
+Following the table, the weakly informative prior in this case is $\text{Half-Normal}(0.5)$.
+
+```{r}
+weakly_prior_OR_scale = 0.5
+
+tau_dist_viz(dist = "half-normal",
+             scale = weakly_prior_OR_scale)
+```
+
+
+### Data
+
+Let's load some data from the `metafor` package. 
+
+```{r}
+pacman::p_load(
+  "readxl",
+  "rstudioapi"
+)
+
+myfile <- selectFile(caption = "choose data")
+
+# takes directory of the file
+mwd <- dirname(myfile)
+
+# take sheet names from excel file selected
+sheet_names <- excel_sheets(myfile)
+  
+# create a list called ma where the data sets will be saved and named according sheet names
+ma <- lapply(sheet_names, function(x) {as.data.frame(read_excel(myfile, sheet = x))})
+
+# name the objects inside the list with the sheet names  
+names(ma) <- sheet_names# choose file
+
+data.mrs <- ma$mrs
+
+```
+
+Let's take a peak at it:
+
+```{r}
+data.mrs
+```
+
+#### Estimate the effect sizes
+
+In this framework, we need to first estimate the effect sizes for each study before fitting the meta-analysis. The `escalc` function from `metafor` is ideal for that.
+
+In this example, we will use odds ratio as our effect size of interest. Remember that internally we work with log(odds ratio).
+
+```{r}
+data.mrs_OR = escalc(measure="OR",
+                ai=event.e,        # ai = events in group 1
+                n1i=n.e,      # n1i = total in group 1
+                ci=event.c,        # ci = events in group 2
+                n2i=n.c,      # n2i = total in group 2
+                data=data.mrs) |> 
+  data.frame()
+
+data.mrs_OR
+```
+
+We need to add a column for standard errors:
+
+```{r}
+data.mrs_OR$sei = sqrt(data.mrs_OR$vi)
+
+data.mrs_OR
+```
+
+### Model
+
+Now let's fit a Bayesian random-effect meta-analysis with the `bayesmeta` function from the `bayesmeta` package. In this section, we will focus on the primary analysis using our set prior for the overall effect parameter ($\mu$) and an informative prior for the between-study heterogeneity parameter ($\tau$).
+
+```{r}
+meta.mrs_OR_mu_informative_tau =
+  bayesmeta(y = data.mrs_OR$yi, 
+            sigma = data.mrs_OR$sei, 
+            labels = data.mrs_OR$author,
+            # Priors
+            mu.prior.mean = prior_mu_mean_OR,
+            mu.prior.sd = prior_mu_sd_OR,
+            tau.prior = informative_tau_prior_OR$dprior # note the "$dprior"
+)
+
+```
+
+```{r}
+meta.mrs_OR_mu_informative_tau
+```
+
+### Results
+
+Quick look (log odds ratio scale)
+
+```{r}
+forestplot(meta.mrs_OR_mu_informative_tau,
+           shrinkage = FALSE, 
+           prediction = TRUE)
+```
+
+```{r}
+png(file = paste0(output,"/","Overall effect ", outcome, ".png"),
+    width = 3000,
+    height = 2500,
+    res = 300)
+
+plot(meta.mrs_OR_mu_informative_tau,
+     which = 3,                        # Overall Effect, "mu"
+     main = "Overall Effect",          # Plot title
+     prior = TRUE)                     # Show the underlying prior distribution 
+
+dev.off() 
+```
+
+```{r}
+png(file = paste0(output,"/","Between study heterogeneity ", outcome, ".png"),
+    width = 3000,
+    height = 2500,
+    res = 300)
+
+plot(meta.mrs_OR_mu_informative_tau,
+     which = 4,                              # Heterogeneity, "tau"
+     main = "Between-study Heterogeneity",   # Plot title
+     prior = TRUE)                           # Also depict the prior distribution 
+
+dev.off() 
+```
+
+Now in the odds ratio scale:
+
+```{r}
+forestplot(meta.mrs_OR_mu_informative_tau,
+           exponentiate = TRUE,
+           shrinkage = FALSE, 
+           prediction = TRUE)
+```
+
+#### Posterior summary
+
+To properly explore the results and make better plots, we need to access the Posterior distributions (remember that in Bayesian analysis the Posterior is the final results, after combining the Prior with the Data).
+
+Let's take a peak at the posterior's summary:
+
+```{r}
+meta.mrs_OR_mu_informative_tau$summary
+```
+
+Let's focus on "tau" (between-study heterogeneity) and "mu" (overall effect). 
+We can access each parameter separately like this:
+
+```{r}
+meta.mrs_OR_mu_informative_tau$summary[ ,"mu"]
+```
+
+```{r}
+meta.mrs_OR_mu_informative_tau$summary[ ,"tau"]
+```
+
+Let's store these results in a list:
+
+```{r}
+posterior.mrs_OR_mu_informative_tau = 
+  list(
+    mu_mean = meta.mrs_OR_mu_informative_tau$summary["mean", "mu"],
+    mu_upper = meta.mrs_OR_mu_informative_tau$summary["95% upper", "mu"],
+    mu_lower = meta.mrs_OR_mu_informative_tau$summary["95% lower", "mu"],
+    
+    tau_median = meta.mrs_OR_mu_informative_tau$summary["median","tau"],  
+    tau_upper = meta.mrs_OR_mu_informative_tau$summary["95% upper","tau"],
+    tau_lower = meta.mrs_OR_mu_informative_tau$summary["95% lower","tau"]
+  )
+
+posterior.mrs_OR_mu_informative_tau
+```
+
+#### Forest plot
+
+Let's make a publication-ready forest plot. We will functions from the `meta` package, which you should already be familiar. First we need to format our data:
+
+```{r}
+# Prepare data for forest plot
+forest.mrs_data_OR = metabin(
+    data = data.mrs_OR,
+    studlab = author,
+    
+    event.e = event.e,  # event.e = events in group 1
+    n.e = n.e,     # n.e = total in group 1
+    event.c = event.c,  # event.c = events in group 2
+    n.c = n.c,     # n.c = total in group 2
+    
+    sm = "OR",
+    
+    # Very important: no frequentist analysis in this plot
+    common = FALSE,
+    random = FALSE
+)
+
+```
+
+Now let's create the forest plot:
+
+```{r}
+# Add Bayesian overall effect posterior summary
+meta.mrs_forest_OR_mu_informative_tau = metaadd(
+  forest.mrs_data_OR,
+  type = "random",
+  
+  TE = posterior.mrs_OR_mu_informative_tau$mu_mean,
+  upper = posterior.mrs_OR_mu_informative_tau$mu_upper,
+  lower = posterior.mrs_OR_mu_informative_tau$mu_lower
+)  
+
+# Create a sentence to summarize tau posterior results
+tau_OR = 
+  paste0("\u03C4 = ", 
+         round(posterior.mrs_OR_mu_informative_tau$tau_median, 2),
+         " [95% CrI ",
+         round(posterior.mrs_OR_mu_informative_tau$tau_lower, 2),
+         ", ",
+         round(posterior.mrs_OR_mu_informative_tau$tau_upper, 2), "]")
+ 
+ # Show forest plot
+png(file = paste0(output,"/","Forest plot informative ", outcome, ".png"),
+    width = 3000,
+    height = 2500,
+    res = 300) 
+
+
+forest.mrs_OR_mu_informative_tau =
+  meta::forest(meta.mrs_forest_OR_mu_informative_tau,
+               layout = "RevMan5",
+               sortvar = TE,
+               text.random = "Bayesian",
+               text.addline1 = tau_OR,
+               smlab = "Odds Ratio (log scale)",
+               leftcols=c("studlab", "event.e", "n.e",
+                          "event.c", "n.c", "effect.ci"),
+               leftlabs=c("Study",  NA, NA, NA, NA, "OR"),
+               
+               pooled.events = TRUE,
+               lab.e = "EVT", 
+               lab.c = "BMT",
+               label.left = "Favors Best Medical Treatment",
+               label.right = "Favors Endovascular",
+               colgap = "5mm")
+
+dev.off() 
+```
+
+#### Posterior Distribution plot
+
+Since we are working under the Bayesian framework, we can also visualize the whole posterior distribution of the overall effect and ask clinically-relevant question.
+
+We will first extract $10000$ samples of the posterior distribution for the overall effect ($\mu$).
+
+```{r}
+# Important to set seed to assure reproducibility
+set.seed(123)
+
+# Generate a vector with 10000 samples
+posterior.mrs_OR_mu_samples_mu_informative_tau = 
+  meta.mrs_OR_mu_informative_tau$rposterior(n = 10000, tau.sample = FALSE)
+
+# Store this vector to a data frame
+df.mrs_OR_mu_samples_mu_informative_tau = 
+  data.frame(samples = posterior.mrs_OR_mu_samples_mu_informative_tau)
+
+
+df.mrs_OR_mu_samples_mu_informative_tau
+```
+
+Let's plot the posterior distribution for the overall effect ($\mu$).
+
+```{r}
+plot.mrs_OR_mu_informative_tau =
+  df.mrs_OR_mu_samples_mu_informative_tau |> 
+  ggplot() +
+  aes(x = samples) |> 
+  ggdist::stat_halfeye(.width = 0.95,
+                       point_interval = "mean_hdi",
+                       fill = "skyblue") +
+  scale_x_continuous(
+    breaks = c(0.5, 1, 1.5, 2, 2.5) |> log(),
+    labels = function(x) exp(x)
+    ) +
+  labs(x = "\nOdds Ratio (log scale)",
+       y = "Density") +
+  theme(axis.text.y = element_blank())
+
+plot.mrs_OR_mu_informative_tau
+```
+
+Adjust the x-axis length with the `coord_cartesian` function
+
+```{r}
+plot.mrs_OR_mu_informative_tau = 
+  plot.mrs_OR_mu_informative_tau +
+  coord_cartesian(x = c(0.4, 2.8) |> log())
+
+plot.mrs_OR_mu_informative_tau
+
+```
+
+#### Posterior Probabilities
+
+
+What is the probability that the odds ratio is greater than 1.0?
+
+```{r}
+# Remember that the data and the analysis use the log scale, so we have to convert
+# to log here
+
+1 - meta.mrs_OR_mu_informative_tau$pposterior(mu = log(1))
+```
+
+What is the probability that the odds ratio is greater than 1.2?
+
+```{r}
+# Subtract the probability above from 1.0
+
+1 - meta.mrs_OR_mu_informative_tau$pposterior(mu = log(1.2))
+```
+
+
+
+What is the probability that the odds ratio is greater than 1.5?
+
+```{r}
+
+1 - meta.mrs_OR_mu_informative_tau$pposterior(mu = log(1.5))
+```
+
+Instead of choosing cutoffs one by one, we can easily plot all posterior probabilities.
+
+First, let's store all posterior probabilities in a data frame.
+
+```{r}
+# Remember that we should ask in the linear scale but then convert to log
+cutoffs = seq(from = 0.02, to = 3, by = 0.02) |> log()
+
+# Calculate posterior probabilities
+lower_or_equal_probabilities.mrs = meta.mrs_OR_mu_informative_tau$pposterior(mu = cutoffs)
+
+# Store them in a data frame
+probabilities.mrs = data.frame(cutoffs,
+                           lower_or_equal_probabilities.mrs)
+```
+
+Now let's plot them!
+
+```{r}
+p_probabilities.mrs = 
+  probabilities.mrs |> 
+  ggplot() +
+  aes(x = cutoffs |> exp(), # exponentiate the cutoffs to look better in the plot
+      y = lower_or_equal_probabilities.mrs) +
+  geom_line() +
+  scale_x_continuous(
+    breaks = seq(from = 0.5, to = 2.5, by = 0.25)
+    ) +
+  coord_cartesian(x = c(0.5, 2.5)) +
+  labs(x = "\nOdds Ratio",
+       y = expression("Probability OR" <= "X")) +
+  theme(panel.grid.major.y = element_line(color = "gray80", linewidth = 0.3))
+
+p_probabilities.mrs
+```
+
+One can also plot both the posterior distribution and the probabilities together
+
+```{r}
+png(file = paste0(output,"/","Posterior distribution informative ", outcome, ".png"),
+    width = 5000,
+    height = 2500,
+    res = 300)
+
+plot.mrs_OR_mu_informative_tau + p_probabilities.mrs
+
+dev.off() 
+```
+
+### Sensitivity analyses
+
+As mentioned in the **Priors** section, we used a Normal(0,0.5^2) prior for the overall effect parameter ($\mu$) and an informative prior for the between-study heterogeneity parameter ($\tau$) in the primary analysis. However, one should also do sensitivity analysis to better understand the impact of informative/weakly informative priors in the results.
+
+We have chosen to one extra analysis:
+
+-   $\mu$: $Normal(0,0.5²)$ prior / $\tau$: weakly-informative prior ($\text{Half-Normal}(0.5)$)
+
+
+Let's fit the model. When we are not using informative priors for $\tau$, we first need to define the distribution before fitting the model.
+
+```{r}
+#weakly_tau_OR_prior = function(x) dhalfnormal(x, scale = weakly_prior_OR_scale)
+
+weakly_tau_OR_prior = function(x) {
+  ifelse(x < 0, 0, 2 * dnorm(x, mean = 0, sd = weakly_prior_OR_scale))
+}
+```
+
+Now let's fit both models:
+
+```{r}
+
+meta.mrs_OR_weakly_tau =
+  bayesmeta(y = data.mrs_OR$yi, 
+            sigma = data.mrs_OR$sei, 
+            labels = data.mrs_OR$author,
+            # Priors
+            mu.prior.mean = prior_mu_mean_OR,
+            mu.prior.sd = prior_mu_sd_OR,
+            tau.prior = weakly_tau_OR_prior
+)
+
+```
+
+Store the posterior results in separate lists:
+
+```{r}
+posterior.mrs_OR_weakly_tau = 
+  list(
+    mu_mean = meta.mrs_OR_weakly_tau$summary["mean", "mu"],
+    mu_upper = meta.mrs_OR_weakly_tau$summary["95% upper", "mu"],
+    mu_lower = meta.mrs_OR_weakly_tau$summary["95% lower", "mu"],
+    
+    tau_median = meta.mrs_OR_weakly_tau$summary["median","tau"],      
+    tau_upper = meta.mrs_OR_weakly_tau$summary["95% upper","tau"],
+    tau_lower = meta.mrs_OR_weakly_tau$summary["95% lower","tau"]
+  )
+
+```
+
+Prepare the data for the forest plot:
+
+```{r}
+
+forest.mrs_data_OR = metabin(
+    data = data.mrs_OR,
+    studlab = author,
+    
+    event.e = event.e,  # event.e = events in group 1
+    n.e = n.e,     # n.e = total in group 1
+    event.c = event.c,  # event.c = events in group 2
+    n.c = n.c,     # n.c = total in group 2
+    
+    sm = "OR",
+    
+    # Very important: no frequentist analysis in this plot
+    common = FALSE,
+    random = FALSE
+)
+```
+
+Put all overall effects results altogether and plot it:
+
+```{r}
+
+# Sensitivity analysis 1: Weakly-informative for tau
+meta.mrs_forest_OR_weakly_tau = metaadd(
+  forest.mrs_data_OR,
+  type = "random",
+  
+  TE = posterior.mrs_OR_weakly_tau$mu_mean,
+  upper = posterior.mrs_OR_weakly_tau$mu_upper,
+  lower = posterior.mrs_OR_weakly_tau$mu_lower
+)  
+ 
+ 
+
+# List the names of each analysis
+analyses = c("Primary analysis: Informative prior for tau",
+             "Sensitivity analysis: Weakly-Informative prior for tau"
+             )
+
+all.mrs_analyses <- metabind(meta.mrs_forest_OR_mu_informative_tau,
+                         meta.mrs_forest_OR_weakly_tau,
+                         name = analyses)
+
+png(file = paste0(output,"/","Forest plot sensitivity ", outcome, ".png"),
+    width = 3000,
+    height = 2500,
+    res = 300)
+
+forest(all.mrs_analyses,
+       smlab = "Overall Effect",
+       leftcols ="studlab")
+
+
+dev.off() 
+```
+
+A critical aspect is to summarize the posterior distributions of the between-study heterogeneity parameter ($\tau$). We can then use a table to show it:
+
+```{r}
+
+tau_OR_informative.mrs = 
+  paste0(round(posterior.mrs_OR_mu_informative_tau$tau_median, 2),
+         " [95% CrI: ",
+         round(posterior.mrs_OR_mu_informative_tau$tau_lower, 2),
+         ", ",
+         round(posterior.mrs_OR_mu_informative_tau$tau_upper, 2), "]")
+
+tau_OR_weakly = 
+  paste0(round(posterior.mrs_OR_weakly_tau$tau_median, 2),
+         " [95% CrI: ",
+         round(posterior.mrs_OR_weakly_tau$tau_lower, 2),
+         ", ",
+         round(posterior.mrs_OR_weakly_tau$tau_upper, 2), "]")
+
+tibble(
+  "Underlying Prior" = c("Informative", "Weakly Informative"),
+  "Posterior" = c(tau_OR_informative.mrs, tau_OR_weakly)
+  ) |> 
+  gt()
+```
+
+We can also focus on the prediction intervals in sensitivity analyses:
+
+```{r}
+prediction.mrs_OR_informative_tau = 
+  list(
+    theta_mean = meta.mrs_OR_mu_informative_tau$summary["mean", "theta"],
+    theta_upper = meta.mrs_OR_mu_informative_tau$summary["95% upper", "theta"],
+    theta_lower = meta.mrs_OR_mu_informative_tau$summary["95% lower", "theta"]
+  )
+
+prediction.mrs_OR_weakly_tau = 
+  list(
+    theta_mean = meta.mrs_OR_weakly_tau$summary["mean", "theta"],
+    theta_upper = meta.mrs_OR_weakly_tau$summary["95% upper", "theta"],
+    theta_lower = meta.mrs_OR_weakly_tau$summary["95% lower", "theta"]
+  )
+
+
+meta.mrs_forest_OR_informative_tau = metaadd(
+  forest.mrs_data_OR, 
+  type = "prediction", # note that now is "prediction"
+  
+  TE = prediction.mrs_OR_informative_tau$theta_mean,
+  upper = prediction.mrs_OR_informative_tau$theta_upper,
+  lower = prediction.mrs_OR_informative_tau$theta_lower
+)  
+
+meta.mrs_forest_OR_mu_weakly_tau = metaadd(
+  forest.mrs_data_OR, 
+  type = "prediction", # note that now is "prediction"
+  
+  TE = prediction.mrs_OR_weakly_tau$theta_mean,
+  upper = prediction.mrs_OR_weakly_tau$theta_upper,
+  lower = prediction.mrs_OR_weakly_tau$theta_lower
+)  
+
+
+# List the names of each analysis
+analyses.mrs = c("Primary analysis: Informative prior for tau",
+             "Sensitivity analysis: Weakly-Informative prior for tau"
+             )
+
+all.mrs_analyses <- metabind(meta.mrs_forest_OR_informative_tau,
+                         meta.mrs_forest_OR_weakly_tau,
+                         
+                         name = analyses.mrs)
+
+png(file = paste0(output,"/","Prediction intervals ", outcome, ".png"),
+    width = 3000,
+    height = 2500,
+    res = 300)
+
+forest(all.mrs_analyses,
+       smlab = "Prediction Intervals",
+       leftcols ="studlab")
+
+
+dev.off() 
+```
+
+
+SAVAGE-DICKEY DENSITY RATIO COMPUTATION
+# Point of interest for the point null hypothesis (H0: mu = 0)
+```{r} 
+null_point <- 0 
+
+# A. Compute the Prior Density at mu = 0 under H1
+prior.mrs_density_at_null <- dnorm(null_point, mean = prior_mu_mean_OR, sd = prior_mu_sd_OR)
+
+# B. Extract the exact Marginal Posterior Density at mu = 0 from bayesmeta
+posterior.mrs_density_at_null <- meta.mrs_OR_mu_informative_tau$dposterior(mu = null_point)
+
+# C. Calculate BF01 (Evidence for Null over Alternative)
+BF_01.mrs <- posterior.mrs_density_at_null / prior.mrs_density_at_null
+
+# D. Calculate BF10 (Evidence for Alternative over Null)
+BF_10.mrs <- prior.mrs_density_at_null / posterior.mrs_density_at_null
+
+# 5. Print out the results clearly
+cat("--- Savage-Dickey Bayes Factor Results ---\n")
+cat("Prior density at mu=0:     ", round(prior.mrs_density_at_null, 4), "\n")
+cat("Posterior density at mu=0: ", round(posterior.mrs_density_at_null, 4), "\n")
+cat("Bayes Factor BF10 (H1 vs H0): ", round(BF_10.mrs, 4), "\n")
+cat("Bayes Factor BF01 (H0 vs H1): ", round(BF_01.mrs, 4), "\n")
+```
