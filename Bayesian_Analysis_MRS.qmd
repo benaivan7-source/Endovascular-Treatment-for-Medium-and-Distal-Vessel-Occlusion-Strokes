@@ -414,8 +414,8 @@ forest.mrs_OR_mu_informative_tau =
                pooled.events = TRUE,
                lab.e = "EVT", 
                lab.c = "BMT",
-               label.left = "Favors Best Medical Treatment",
-               label.right = "Favors Endovascular",
+               label.left = "Favors BMT",
+               label.right = "Favors EVT",
                colgap = "5mm")
 
 dev.off() 
