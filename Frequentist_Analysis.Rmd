@@ -140,14 +140,14 @@ meta <- metabin(event.e, n.e,
 At this step, we will already export the forest plot to the output folder. It is essential that you review the documentation on how to edit your forest plot, so you can fully understand how this conversion is performed and how to customize the figure according to your needs.
 ```{r}
 if (outcome == "Functional Independence (mRs 0-2)") {
-  lbl_left <- "Favors Best Medical Treatment"
-  lbl_right <- "Favors Endovascular"
-  loo_xlab <- "Favors Best Medical Treatment    Favors Endovascular"
+  lbl_left <- "Favors BMT"
+  lbl_right <- "Favors EVT"
+  loo_xlab <- "Favors BMT    Favors EVT"
 } else {
   # For adverse events (Mortality and sICH)
-  lbl_left <- "Favors Endovascular"
-  lbl_right <- "Favors Best Medical Treatment"
-  loo_xlab <- "Favors Endovascular    Favors Best Medical Treatment"
+  lbl_left <- "Favors EVT"
+  lbl_right <- "Favors BMT"
+  loo_xlab <- "Favors EVT    Favors BMT"
 }
 
 png(file = paste0(output,"/","Forest plot ", outcome, ".png"),
