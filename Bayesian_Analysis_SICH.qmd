@@ -433,8 +433,8 @@ forest.sich_OR_mu_informative_tau =
                pooled.events = TRUE,
                lab.e = "EVT", 
                lab.c = "BMT",
-               label.left = "Favors Endovascular",
-               label.right = "Favors Standard",
+               label.left = "Favors EVT",
+               label.right = "Favors BMT",
                colgap = "5mm")
 
 dev.off() 
