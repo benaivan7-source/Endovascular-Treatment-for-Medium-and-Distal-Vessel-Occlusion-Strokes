@@ -42,7 +42,7 @@ if (meta_version > "8.3-0") {
   pacman::p_load(char = c("meta", other_packages))
   
 } else {
-  # If meta is not installed or version is less than 8.3-0, force install meta 7.0-0 and load all packages
+  # If meta is not installed or version is less than 8.3-0, force install meta 8.3-0 and load all packages
   remotes::install_version("meta", "8.3-0")
   pacman::p_load(char = c("meta", other_packages))
 }
