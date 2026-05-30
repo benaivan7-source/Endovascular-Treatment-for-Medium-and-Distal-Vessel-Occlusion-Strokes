@@ -40,6 +40,7 @@ This repository contains the complete analytical pipeline and replication code f
 * `Bayesian_Analysis_SICH.R` - Executes the Bayesian random-effects models, posterior probability calculations, and distribution visualizations for symptomatic intracranial hemorrhage.
     
 * `MDVO_outcomes.xlsx` -  The required structure for the summary data input.
+* `Data_Extraction_Sheet.xlsx` -  The required extracted data by the two authors.
 
 ---
 
